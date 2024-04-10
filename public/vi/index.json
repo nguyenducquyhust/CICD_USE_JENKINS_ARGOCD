@@ -1,0 +1,106 @@
+[
+{
+	"uri": "//localhost:1313/vi/3-installargocd/3.1-installminikube/",
+	"title": "Cài đặt và triển khai Argo CD ",
+	"tags": [],
+	"description": "",
+	"content": "I. Cài đặt Minikube Tại giao diện cmd đang ssh vào EC2, tải xuống trực tiếp Minikube\ncurl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 \\ \u0026amp;\u0026amp; chmod +x minikube Thêm Minikube vào biến môi trường path\nsudo mkdir -p /usr/local/bin/\rsudo install minikube /usr/local/bin/ Kiểm tra xem Minikube đã được cài đặt thành công hay chưa\nminikube version Sau khi cài đặt thành công, chạy cluster trong minikube\nminikube start Kiểm tra xem Minikube đã được khởi động thành công hay chưa\nminikube status Tạo repo manifest để chứa các config cho Kubernetes Vào file Jenkinsfile và thêm đoạn code sau để jenkins có thể thực hiện việc update repo manifest stage(\u0026#39;update-manifest\u0026#39;) {\rsteps {\rscript {\r// Thực hiện checkout từ GitLab repository mới\rcheckout([$class: \u0026#39;GitSCM\u0026#39;,\rbranches: [[name: \u0026#39;main\u0026#39;]], // Chọn nhánh bạn muốn checkout\rdoGenerateSubmoduleConfigurations: false,\rextensions: [[$class: \u0026#39;SubmoduleOption\u0026#39;, disableSubmodules: false, parentCredentials: true, recursiveSubmodules: true, reference: \u0026#39;\u0026#39;, trackingSubmodules: false]],\rsubmoduleCfg: [],\ruserRemoteConfigs: [[url: \u0026#39;https://gitlab.com/nguyenducquyhust/cicd-pipeline.git\u0026#39;]]])\r// Tiếp tục với các bước khác trong stage\rwithCredentials([string(credentialsId: \u0026#39;gitlab-tokens\u0026#39;, variable: \u0026#39;gitlab-tokens\u0026#39;)]) {\rsh \u0026#39;\u0026#39;\u0026#39;\rgit config user.email \u0026#34;your_email\u0026#34;\rgit config user.name \u0026#34;user_name\u0026#34;\rBUILD_NUMBER=${BUILD_NUMBER}\rpwd\rls\rrealpath deployment.yaml\rgit clean -fdx\rgit checkout main\rgit pull origin main\rgit branch\rsed -i \u0026#34;s/replaceImageTag/$IMAGE_VERSION.${BUILD_NUMBER}/g\u0026#34; deployment.yaml\rcat deployment.yaml\rgit status\rgit add .\rgit commit -m \u0026#34;Update deployment image to version $IMAGE_VERSION.${BUILD_NUMBER}\u0026#34;\rgit push -f \u0026lt;https://${GIT_USER_NAME}:${GIT_PASSWORD}@gitlab.com/nguyenducquyhust/cicd-pipeline.git\u0026gt; HEAD:main\r\u0026#39;\u0026#39;\u0026#39;\r}\r}\r}\r} Truy cập vào Jenkins Dashboard \u0026gt; Manage Jenkins \u0026gt; Credentials\nChọn Add new credential với nội dung như dưới đây: Trong đó trường Secret chính là access token của gitlab\nII. Cài đặt Kubectl Tải xuống phiên bản kubectl mới nhất\ncurl -LO \u0026#34;https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\u0026#34; Cài đặt kubectl\nsudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl\rchmod +x kubectl\rmkdir -p ~/.local/bin\rmv ./kubectl ~/.local/bin/kubectl Kiểm tra để đảm bảo đã cài đặt\nkubectl version --client III. Cài đặt Argo CD trên Minikube Đảm bảo đã cài đặt thành công minikube, kubectl và docker\nCài đặt phiên bản Argo CD mới nhất\ncurl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64\rsudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd\rrm argocd-linux-amd64 Cài Argo CD trên cụm K8s\nTạo một namespace cho argocd - nơi các dịch vụ và tài nguyên của Argo CD sẽ tồn tại kubectl create namespace argocd Argo CD có thể được cài đặt bằng cách sử dụng manifest. Tải manifest và áp dụng chúng vào cụm Minikube của mình kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml Kiểm tra các pods của Argo CD\nkubectl get pods -n argocd Đảm bảo rằng tất cả các pod Argo CD (argocd-server, argocd-dex-server, \u0026hellip;) đang chạy mà không gặp bất kỳ sự cố nào.\nIV. Truy cập vào giao diện Argo CD trên trình duyệt Sau khi cài đặt xong, lấy mật khẩu của Argo CD để đăng nhập:\nkubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\u0026#34;{.data.password}\u0026#34; | base64 -d Thực hiện port forward\nkubectl port-forward svc/argocd-server -n argocd 8088:443 Truy cập vào [Public_IPv4_address]:8088 để đăng nhập vào ArgoCD với Username:admin và password vừa lấy ở trên\nV. Triển khai ứng dụng trên Minikube thông qua giao diện Argo CD Sau khi đăng nhập được thì chọn New App và setup dựa theo bên dưới: Kết quả thu được sẽ như này Lúc này có thể ấn Sync để deploy bản mới nhất\n"
+},
+{
+	"uri": "//localhost:1313/vi/1-introduce/",
+	"title": "Giới thiệu",
+	"tags": [],
+	"description": "",
+	"content": "Giới thiệu CI/CD, Jenkins và ArgoCD CI/CD là viết tắt của Continuous Integration/Continuous Delivery hoặc Continuous Deployment. Đây là một phương pháp phát triển phần mềm mục tiêu đến việc tự động hóa quá trình tích hợp, kiểm thử, phân phối và triển khai ứng dụng.\nCI/CD sẽ liên tục kiểm tra test code mới. Điều này giúp ngăn chặn các lỗi trong hệ thống trước khi code mới được cập nhật lên server. Việc tích hợp và kiểm thử thường xuyên giúp phát hiện và sửa lỗi sớm, tránh được các vấn đề lớn ở giai đoạn sau. CI/CD tự động hóa quá trình phát triển và triển khai, giúp teams đẩy nhanh việc release sản phẩm mới.\nCác công cụ phổ biến hỗ trợ CI/CD bao gồm Jenkins, GitLab CI, Travis CI, CircleCI, và ArgoCD cho Kubernetes. Thông thường, hay được sử dụng nhất là:\nJenkins - một công cụ open-source tự động hóa các nhiệm vụ phát triển phần mềm như build, test và deploy. ArgoCD - một công cụ điều phối liên tục dành cho Kubernetes, giúp tự động hóa việc triển khai ứng dụng trong kiến trúc microservices và quản lý nhiều môi trường Kubernetes một cách nhất quán. Cách tiếp cận này không chỉ cải thiện hiệu suất làm việc nhóm mà còn giúp sản phẩm của bạn đạt đến tay người dùng nhanh chóng với chất lượng cao hơn. Ở môi trường điện toán đám mây, các nhà phát triển thường sử dụng Docker để đóng gói và Kubernetes để điều phối.\nNội dung Quy trình hoạt động CI/CD Jenkins ArgoCD Bây giờ chúng ta sẽ cùng nhau đi qua các khái niệm cơ bản nhất của CI/CD, Jenkins và ArgoCD nhé.\n"
+},
+{
+	"uri": "//localhost:1313/vi/1-introduce/1.1-cicdprocess/",
+	"title": "Quy trình hoạt động CI/CD",
+	"tags": [],
+	"description": "",
+	"content": "Quy trình hoạt động CI/CD Nếu muốn hiểu kỹ hơn về cách thức hoạt động của quy trình CI/CD, bạn cần nắm được các bước tiến hành cụ thể trong quy trình đó. Vậy những bước này bao gồm những gì và chúng hoạt động ra sao?\nTích hợp Liên tục (CI) là quy trình đầu tiên, nơi mà các lập trình viên thường xuyên hợp nhất code của họ vào một kho lưu trữ chung như Git, nhiều lần trong ngày. Mỗi lần hợp nhất thường được xây dựng và kiểm thử tự động để phát hiện lỗi càng sớm càng tốt, giảm thiểu việc tích tụ lỗi và giảm thời gian cần thiết để hoàn thành và cho ra sản phẩm chất lượng. Phân phối liên tục (CD) là mở rộng CI bằng cách đảm bảo rằng bạn có thể phát hành phiên bản mới của phần mềm vào bất kỳ thời điểm nào. Trong CD, việc xây dựng, kiểm thử và chuẩn bị cho việc phát hành mã nguồn được tự động hóa. Triển khai liên tục (CD) là một bước tiếp theo của CD, nơi phát hành tự động các thay đổi mã nguồn đã qua kiểm thử vào môi trường sản xuất. Điều này giúp mọi thay đổi sau khi được kiểm tra có thể được triển khai một cách tự động. Quá trình vòng đời phát triển cùng với các bước làm việc trong CI/CD diễn ra như sau:\nBuild: Tạo sản phẩm từ mã nguồn, tích hợp và phát hiện lỗi. Test: Tự động kiểm tra tính năng mới và code thay đổi. Deliver: Đưa code đã kiểm tra vào môi trường test, có thể tự động hoặc sau khi được chấp thuận từ con người. Deploy: Áp dụng các thay đổi lên sản phẩm, tự động hoặc theo phê duyệt từ con người. "
+},
+{
+	"uri": "//localhost:1313/vi/2-installjenkins/2.1-createec2/",
+	"title": "Tạo máy chủ EC2",
+	"tags": [],
+	"description": "",
+	"content": "Tạo máy chủ EC2 Truy cập AWS Management Console\nTìm EC2 Chọn EC2 Trong giao diện EC2\nChọn Instances Chọn Launch instances Name and tags của instance, nhập workshop Thực hiện chọn AMI\nChọn Quick Start Chọn Amazon Linux Chọn AMI Thực hiện chọn Instance type và Chọn Create new key pair Trong giao diện Cretae key pair\nKey pair name, nhập aws-keypair (tên tùy chọn, bạn có thể đặt bất kỳ). Key pair type, chọn RSA Private key file format, chọn .pem Thực hiện cấu hình Network\nVPC, chọn default Auto-assign public IP, chọn Enable Firewall (Security Group), chọn Create security group Tích chọn rules như hình Thực hiện chọn Advanced details User data, viết file user data cho EC2 sudo yum update -y\rsudo yum install -y docker\rsudo service docker start\rsudo usermod -a -G docker ec2-user Chọn Launch instance Hoàn thành tạo instance Đợi khoảng 5 phút Status check sẽ chuyển sang 2/2 checks passed "
+},
+{
+	"uri": "//localhost:1313/vi/",
+	"title": "Triển khai CI/CD sử dụng Jenkins và Argo CD",
+	"tags": [],
+	"description": "",
+	"content": "Triển khai CI/CD sử dụng Jenkins và Argo CD Tổng quan Trong bài lab này, bạn sẽ tìm hiểu các khái niệm cơ bản và thực hành việc thiết lập Jenkins và Argo CD để tự động hóa các giai đoạn xây dựng và kiểm thử của ứng dụng, đồng thời sử dụng Argo CD để tự động triển khai ứng dụng đến môi trường mong muốn, cải thiện tốc độ và độ tin cậy của quá trình giao hàng phần mềm, đồng thời đảm bảo tất cả các thay đổi được theo dõi và kiểm toán trong Git.\nNội dung Giới thiệu CI/CD, Jenkins và Argo CD Cài đặt Jenkins Cài đặt và triển khai Argo CD Dọn dẹp tài nguyên "
+},
+{
+	"uri": "//localhost:1313/vi/2-installjenkins/",
+	"title": "Cài đặt Jenkins ",
+	"tags": [],
+	"description": "",
+	"content": "Cài đặt Jenkins Ở bước này chúng ta sẽ cài đặt Jenkins và tích hợp Gitlab với Jenkins\nNội dung Cài đặt EC2 làm máy chủ Jenkins SSH vào EC2 để cài Jenkins Thiết lập kết nối giữa Jenkins và Gitlab "
+},
+{
+	"uri": "//localhost:1313/vi/1-introduce/1.2-jenkins/",
+	"title": "Jenkins",
+	"tags": [],
+	"description": "",
+	"content": "Jenkins Jenkins là một công cụ tự động hóa mã nguồn mở giúp tự động hóa các phần khác nhau của quá trình phát triển phần mềm như build, test và triển khai ứng dụng. Nó hỗ trợ tích hợp liên tục (Continuous Integration) và phân phối liên tục (Continuous Delivery).\nBạn có thể sử dụng Amazon Elastic Computer Cloud (Amazon EC2) để triển khai ứng dụng Jenkins trên AWS chỉ trong vài phút.\nTrong bài viết này sẽ hướng dẫn bạn quá trình triển khai một ứng dụng Jenkins. Bạn sẽ khởi chạy một EC2 instance, cài đặt và cấu hình Jenkins trên instance đó.\n"
+},
+{
+	"uri": "//localhost:1313/vi/3-installargocd/4.2-connectec2/",
+	"title": "Kiểm tra kết nối",
+	"tags": [],
+	"description": "",
+	"content": "Kiểm tra kết nối Có nhiều cách kết nối EC2, các bạn có thể tham khảo kết nối EC2 bằng PuTTY. Trong bài lab, chúng ta sử dụng MobaXterm để kết nối EC2\nThực hiện tải MobaXterm Truy cập vào trang EC2\nChọn Instances Chọn EC2 Public Chọn Details Xem Public IPv4 address Sau khi tải MobaXterm, tiến hành giải nén và mở\nChọn Session Trong giao diện Session settings\nChọn SSH Trong giao diện Session settings\nRemote host, nhập Public IPv4 address Specify username, nhập ec2-user Use private key, chọn đường dẫn của aws-keypair.pem đã tạo và tải về máy lúc tạo EC2. Kết nối thành công. Kiểm tra kết nối tới internet của EC2 Public, ta thực hiện lệnh: ping amazon.com -c5 Thực hiện ping đến EC2 private ping \u0026lt;IP Private EC2 Private\u0026gt; Kết nối vào máy chủ EC2 Private và kiểm tra kết nối internet. Truy cập vào EC2\nChọn Instances Chọn EC2 Private Chọn Details Chọn Private IPv4 addresses Sau đó kết nối SSH vào EC2 Public Thực hiện lệnh ping \u0026lt;địa chỉ IP private của EC2 Private\u0026gt; để kiểm tra kết nối từ máy chủ EC2 Public sang máy chủ EC2 Private. Chúng ta kiểm tra kết nối giữa 2 EC2 instance bằng câu lệnh: ping 10.10.4.105 -c5 EC2 Private sẽ không có public IP address vì chúng ta không gán cho máy chủ này public IP. Để có thể ssh vào EC2 Private, chúng ta sẽ thực hiện kết nối ssh từ EC2 Public thông qua địa chỉ private IP address của EC2 Private\nDownload công cụ pscp vào cùng thư mục chứa file aws-keypair.ppk để thực hiện copy file aws-keypair.pem từ máy của chúng ta vào EC2 Public. Bạn tải a RSA and DSA key generation utility là dạng puttygen.exe\nBạn tải an SCP client, i.e. command-line secure file copy là dạng pscp.exe\nChúng ta sử dụng puttygen.exe để generation key\nChọn Load Chọn aws-keypair.pem\nChọn OK Chọn Save private key với tên aws-keypair.ppk Hoàn thành generation key Khởi chạy Command Prompt. Chuyển đường dẫn tới thư mục bạn vừa download pscp. Chạy lệnh dưới đây để upload file aws-keypair.pem lên thư mục /home/ec2-user/ của máy chủ EC2 Public.\nBạn sẽ cần thay thế thông số public IP address của EC2 Public trước khi chạy câu lệnh. pscp -i aws-keypair.ppk aws-keypair.pem ec2-user@\u0026lt;EC2 PUBLIC public IP address\u0026gt;:/home/ec2-user/ Truy cập vào EC2\nChọn Instances Chọn EC2 Public Chọn Details Xem Public IPv4 address Quay trở lại giao diện kết nối EC2. Để đảm bảo bạn copy file aws-keypair.pem lên máy chủ EC2 Public ta thực hiện lệnh ls Cập nhật quyền cho file aws-keypair.pem bằng cách chạy lệnh chmod 400 aws-keypair.pem. AWS yêu cầu file key pair cần được hạn chế quyền truy cập trước khi được sử dụng để kết nối tới máy chủ EC2. chmod 400 aws-keypair.pem SSH tới máy chủ EC2 Private ssh -i aws-keypair.pem ec2-user@\u0026lt;EC2 Private server\u0026#39;s private IP address\u0026gt; Thực hiện ping test tới amazon.com. Bạn có thể thấy, chúng ta không thể kết nối internet từ EC2 Private. Trong bước tiếp theo chúng ta sẽ tạo NAT Gateway để cho phép máy chủ EC2 Private kết nối internet theo chiều từ nội bộ đi ra. Giữ nguyên kết nối tới EC2 Private để chúng ta có thể kiểm tra kết nối tới internet sau khi hoàn tất tạo và cấu hình NAT Gateway nhé. ping amazon.com "
+},
+{
+	"uri": "//localhost:1313/vi/2-installjenkins/2.2-sshec2/",
+	"title": "SSH vào EC2 để cài Jenkins",
+	"tags": [],
+	"description": "",
+	"content": "SSH vào EC2 để cài Jenkins Copy đường dẫn trong mục Example Vào thư mục chứa file key-pair vừa tải về ở mục 2.1, mở bằng Git bash và dán đường dẫn để ssh vào EC2 Tạo network cho 2 container sudo chmod 666 /var/run/docker.sock\rdocker network create jenkins Setup docker:dind docker run --name jenkins-docker -d --privileged --network jenkins --network-alias docker --env DOCKER_TLS_CERTDIR=/certs --volume docker-certs-jk:/certs/client --volume jenkins-home:/var/jenkins_home -p 2376:2376 docker:dind --storage-driver overlay2 Run container Jenkins docker run --name jenkins -d --network jenkins --env DOCKER_HOST=tcp://docker:2376 --env DOCKER_CERT_PATH=/certs/client --env DOCKER_TLS_VERIFY=1 -p 8080:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home -v docker-certs-jk:/certs/client:ro jenkins/jenkins:2.426.2-lts-jdk17 Mở port 8080 cho Ec2 Chọn Security Group Chọn Edit inbound rules Mục Type chọn CustomTCP Port range chọn 8080 Source chọn 0.0.0.0/0 Lấy mật khẩu để unlock Jenkins Thay [jenkins_container_id] bằng id của bạn docker container ls\rdocker logs [jenkins_container_id] Lưu mật khẩu dùng cho bước sau Unlock Jenkins Chọn EC2 vừa khởi chạy Copy địa chỉ Public IPv4 Mở trình duyệt bằng đường dẫn Public_IPv4_address:8080 Dán mật khẩu bên trên vào mục Aministrator password Tạo tài khoản Jenkins Đợi Jenkins chạy xong phần khởi động Điền các thông tin của bạn Chọn Save and Continue Instance configuration Dán địa chỉ http://[Public_IPv4_address]:8080 vào mục Jenkins URL Hoàn thành tạo Jenkins "
+},
+{
+	"uri": "//localhost:1313/vi/1-introduce/1.3-argocd/",
+	"title": "Argo CD",
+	"tags": [],
+	"description": "",
+	"content": "Argo CD Argo CD là một dự án mã nguồn mở chỉ định để cung cấp triển khai tự động cho các dự án Kubernetes. Nó tuân theo nguyên lý \u0026ldquo;GitOps\u0026rdquo;, tự động đồng bộ hóa các dự án trên Kubernetes để phù hợp với mã nguồn trong git repo. Chỉ cần commit các thay đổi vào git, Argo CD sẽ đảm nhiệm việc cập nhật lại các dự án trong Kubernetes.\nCác tính năng chính của Argo CD bao gồm:\nTự động hóa triển khai: Khi có các commit mới vào nhánh được theo dõi trong Git repository, Argo CD tự động triển khai các thay đổi này vào Kubernetes. Quản lý đa môi trường: Argo CD có thể quản lý nhiều môi trường Kubernetes, từ phát triển (dev), kiểm thử (staging) đến sản xuất (production). Health and Integrity Checks: Nó có thể tự động kiểm tra \u0026ldquo;sức khỏe\u0026rdquo; của ứng dụng sau khi triển khai và bảo đảm sự toàn vẹn theo thời gian. Rollback \u0026amp; Rollout: Hỗ trợ quay về các phiên bản trước hoặc triển khai lần lượt các bản cập nhật mới một cách dễ dàng. "
+},
+{
+	"uri": "//localhost:1313/vi/3-installargocd/",
+	"title": "Cài đặt Argo CD ",
+	"tags": [],
+	"description": "",
+	"content": "Cài đặt Argo CD In this step we will develop Kubernetes using Minikube (a Kubernetes installer)\nNội dung Cài đặt Minikube Thiết lập Repo Manifest "
+},
+{
+	"uri": "//localhost:1313/vi/2-installjenkins/2.3-connectec2/",
+	"title": "Thiết lập kết nối giữa Jenkins và Gitlab",
+	"tags": [],
+	"description": "",
+	"content": "Thiết lập kết nối giữa Jenkins và Gitlab Cài đặt plugin jenkins Truy cập vào Manage Jenkins -\u0026gt; Plugin -\u0026gt; Available plugin tiến hành cài đặt plugin phù hợp cho project: Gitlab , Docker và Docker pipeline Cài đặt Tools jenkins\nManage Jenkins -\u0026gt; Tools, kéo xuống phần JDK installations ấn vào Add JDK Trong phần Name đặt là Jdk Tích Install automatically Đối với Git, Docker, Maven làm tương tự Tạo item\nTại giao diện Jenkins chọn New item Chọn Pipeline và đặt tên cho pipeline Cấu hình cho Jenkins\nỞ phần General có thể chọn như dưới để lưu lại 5 bản chạy gần nhất(số lượng có thể tùy chỉnh) Kéo xuống phần Build Trigger, chọn option như dưới đây để Jenkins CI/CD Pipeline của bạn chạy cả được những action như push, merge code. Sang gitlab copy URL clone dự án Quay trở lại giao diện Jenkins, trong Advanced Project Options, setup như hình dưới và URL chính là cái vừa copy từ gitlab Thêm Credentials (lưu ý là tài khoản gitlab phải có quyền admin hoặc quyền đủ truy cập dự án, không là Jenkins CI/CD pipeline không clone code về được). Ra ngoài chọn lại Credential mình vừa add Cấu hình Pipeline Tạo webhook trên Gitlab để Jenkins có thể kết nối repository Gitlab và thực hiện các bước CI/CD khi có code mới được push lên\nỞ giao diện Jenkins, cạnh cái User_name ấn vào dấu mũi tên -\u0026gt; Configure Tạo token để tích hợp trong gitlab Truy cập vào dự án trên gitlab, chọn Settings → Webhook -\u0026gt; Add new webhook Mục URL hãy cấu hình như sau http://\u0026lt;account trên jenkins\u0026gt;:\u0026lt;token account jenkins\u0026gt;@\u0026lt;địa chỉ jenkins\u0026gt;/project/\u0026lt;tên project trên jenkins\u0026gt;\rVí dụ: http://workshop:116ab6d523026ec1f474f13f1c0ea22345@13.229.78.87:8080/project/Workshop Cấu hình Trigger như hình Bỏ tích chọn SSL verification và kiểm tra trạng thái push events thành công Hoàn thành tích hợp Gitlab và Jenkins\nTạo Jenkinsfile\nTrong dự án tại thư mục gốc (cùng cấp docker-compose.yml file), tạo Jenkinsfile như dưới đây Mình chỉ thêm job đơn giản là in ra người dùng và thư mục hiện tại, bây giờ chúng ta sẽ thử commit code trên Gitlab Sau khi commit xong thì merge request, lúc này sẽ enable trigger để CI/CD pipeline bắt đầu chạy Quay sang Jenkins để check\nTại giao diện Jenkins, các bước đều thành công "
+},
+{
+	"uri": "//localhost:1313/vi/4-cleanup/",
+	"title": "Dọn dẹp tài nguyên",
+	"tags": [],
+	"description": "",
+	"content": "Dọn dẹp tài nguyên Chúng ta sẽ tiến hành xóa các tài nguyên theo thứ tự sau\nTerminate các EC2 Instance. Terminate EC2 instance. Truy cập Amazon EC2 console tại địa chỉ EC2. Trên thanh điều hướng bên trái, chọn Intances Chọn tất cả EC2 Instance liên quan tới bài lab. Chọn Instance state Chọn Terminate instance Xác nhận terminate. Xóa NAT Gateway, Elastic IP Address Xóa NAT Gateway và Elastic IP Address. AWS sẽ thu tiền cho các EIP lãng phí nên bạn cần kiểm tra kỹ để tránh bị trừ chi phí ngoài ý muốn. Truy cập trang Amazon VPC console tại địa chỉ VPC Trên thanh điều hướng bên trái , click NAT Gateway. Chọn NAT Gateway. Click Action. Click Delete NAT Gateway. Gõ delete. Click Delete để xác nhận xóa NAT Gateway Xóa xóa Elastic IP Address. Tiếp tục xóa Elastic IP Address. Truy cập trang Amazon VPC console tại địa chỉ https://console.aws.amazon.com/vpc/ Trên thanh điều hướng bên trái , click Elastic IP. Chọn Elastic IP Address chúng ta đã tạo. Click Action. Click Release Elastic IP Address Click Release. Xóa EC2 Instance concect endpoint Truy cập vào giao dịch Endpoint Chọn Action, chọn Delete VPC endpoints Nhập delete Tiếp tục làm tương tự và xóa theo thứ tự sau nhé: VPN Site to Site connection. Virtual Private Gateway. Customer Gateway. VPC ASG VPN VPC ASG. "
+},
+{
+	"uri": "//localhost:1313/vi/categories/",
+	"title": "Categories",
+	"tags": [],
+	"description": "",
+	"content": ""
+},
+{
+	"uri": "//localhost:1313/vi/tags/",
+	"title": "Tags",
+	"tags": [],
+	"description": "",
+	"content": ""
+}]

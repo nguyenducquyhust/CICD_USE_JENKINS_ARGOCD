@@ -1,0 +1,106 @@
+[
+{
+	"uri": "//localhost:1313/2-installjenkins/2.1-createec2/",
+	"title": "Create EC2 Server",
+	"tags": [],
+	"description": "",
+	"content": "Create EC2 Instances Access the AWS Management Console\nNavigate to EC2 Click on EC2 2.In the EC2 interface\nSelect Instances Choose Launch instances Provide a Name and tags for the instance, enter workshop Choose the AMI\nSelect Quick Start Select Amazon Linux Select an AMI Select an Instance type and opt to Create new key pair In the Cretae key pair interface\nSpecify the Key pair name, e.g., aws-keypair (optional name, you can set any). Choose Key pair type:RSA Select Private key file format:.pem Configure the Network\nSelect the VPC: default Enable Auto-assign public IP For Firewall (Security Group), select Create security group Select rules as shown Select Advanced details User data, write user data file for EC2 sudo yum update -y\rsudo yum install -y docker\rsudo service docker start\rsudo usermod -a -G docker ec2-user Choose Launch instance Complete the instance creation Wait for about 5 minutes until the Status check shows 2/2 checks passed "
+},
+{
+	"uri": "//localhost:1313/",
+	"title": "Implementing CI/CD using Jenkins and Argo CD",
+	"tags": [],
+	"description": "",
+	"content": "Implementing CI/CD using Jenkins and Argo CD Overview In this lab, you will learn the basic concepts and practice setting up Jenkins and Argo CD to automate the build and test stages of the application, and use Argo CD to automatically deploy the application to the desired environment, improving the speed and reliability of the software delivery process, while ensuring that all changes are tracked and audited in Git.\nContent Introduction to CI/CD, Jenkins and Argo CD Install Jenkins Install Argo CD Resource Cleanup "
+},
+{
+	"uri": "//localhost:1313/3-installargocd/3.1-installminikube/",
+	"title": "Installation and Deployment of Argo CD",
+	"tags": [],
+	"description": "",
+	"content": "I. Install Minikube At the cmd interface, SSH into EC2 and directly download Minikube\ncurl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 \\ \u0026amp;\u0026amp; chmod +x minikube Add Minikube to the PATH environment variable\nsudo mkdir -p /usr/local/bin/\rsudo install minikube /usr/local/bin/ Check if Minikube has been installed successfully or not\nminikube version After successful installation, run a cluster within Minikube\nminikube start Check whether Minikube has been successfully started or not\nminikube status Create a repo manifest to store configurations for Kubernetes Navigate to the Jenkinsfile and add the following code snippet so that Jenkins can perform the update repo manifest task stage(\u0026#39;update-manifest\u0026#39;) {\rsteps {\rscript {\r// Thực hiện checkout từ GitLab repository mới\rcheckout([$class: \u0026#39;GitSCM\u0026#39;,\rbranches: [[name: \u0026#39;main\u0026#39;]], // Chọn nhánh bạn muốn checkout\rdoGenerateSubmoduleConfigurations: false,\rextensions: [[$class: \u0026#39;SubmoduleOption\u0026#39;, disableSubmodules: false, parentCredentials: true, recursiveSubmodules: true, reference: \u0026#39;\u0026#39;, trackingSubmodules: false]],\rsubmoduleCfg: [],\ruserRemoteConfigs: [[url: \u0026#39;https://gitlab.com/nguyenducquyhust/cicd-pipeline.git\u0026#39;]]])\r// Tiếp tục với các bước khác trong stage\rwithCredentials([string(credentialsId: \u0026#39;gitlab-tokens\u0026#39;, variable: \u0026#39;gitlab-tokens\u0026#39;)]) {\rsh \u0026#39;\u0026#39;\u0026#39;\rgit config user.email \u0026#34;your_email\u0026#34;\rgit config user.name \u0026#34;user_name\u0026#34;\rBUILD_NUMBER=${BUILD_NUMBER}\rpwd\rls\rrealpath deployment.yaml\rgit clean -fdx\rgit checkout main\rgit pull origin main\rgit branch\rsed -i \u0026#34;s/replaceImageTag/$IMAGE_VERSION.${BUILD_NUMBER}/g\u0026#34; deployment.yaml\rcat deployment.yaml\rgit status\rgit add .\rgit commit -m \u0026#34;Update deployment image to version $IMAGE_VERSION.${BUILD_NUMBER}\u0026#34;\rgit push -f \u0026lt;https://${GIT_USER_NAME}:${GIT_PASSWORD}@gitlab.com/nguyenducquyhust/cicd-pipeline.git\u0026gt; HEAD:main\r\u0026#39;\u0026#39;\u0026#39;\r}\r}\r}\r} Access the Jenkins Dashboard \u0026gt; Manage Jenkins \u0026gt; Credentials\nSelect Add new credential with the following content: The field Secret is the access token for GitLab\nII. Install Kubectl Download the latest version of kubectl\ncurl -LO \u0026#34;https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\u0026#34; Install kubectl\nsudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl\rchmod +x kubectl\rmkdir -p ~/.local/bin\rmv ./kubectl ~/.local/bin/kubectl Check to ensure it\u0026rsquo;s installed\nkubectl version --client III. Install Argo CD on Minikube Ensure that Minikube, kubectl, and Docker are successfully installed\nInstall the latest version of Argo CD\ncurl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64\rsudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd\rrm argocd-linux-amd64 Install Argo CD on a Kubernetes cluster\nCreate a namespace for argocd - where the services and resources of Argo CD will reside kubectl create namespace argocd Argo CD can be installed using its manifests. Download these manifests and apply them to your Minikube cluster kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml Verify Argo CD Pods\nkubectl get pods -n argocd Ensure that all Argo CD pods (argocd-server, argocd-dex-server, \u0026hellip;) are running without any issues\nIV. Access Argo CD UI on Browser Get the initial password for the admin user to log in\nkubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\u0026#34;{.data.password}\u0026#34; | base64 -d By default, the ArgoCD server is not exposed outside the cluster. You can expose it using port-forwarding to access the ArgoCD UI.\nkubectl port-forward svc/argocd-server -n argocd 8088:443 Access [Public_IPv4_address]:8088 to log in to Argo CD with Username: admin and the password obtained earlier\nV. Deploy Application on Minikube using Argo CD UI After successfully logging in, select New App and set up based on the instructions below: The result obtained will be like this At this point, you can press Sync to deploy the latest version\n"
+},
+{
+	"uri": "//localhost:1313/1-introduce/",
+	"title": "Introduction",
+	"tags": [],
+	"description": "",
+	"content": "Introduction to CI/CD, Jenkins and ArgoCD CI/CD stands for Continuous Integration/Continuous Delivery or Continuous Deployment. This is a software development approach aimed at automating the integration, testing, delivery, and deployment processes of applications.\nCI/CD continuously tests new code commits. This helps to prevent errors in the system before the new code is updated on the server. Regular integration and testing help identify and fix errors early, avoiding major problems in later stages. CI/CD automates the development and deployment processes, helping teams accelerate the release of new products.\nPopular tools that support CI/CD include Jenkins, GitLab CI, Travis CI, CircleCI, and ArgoCD for Kubernetes. Typically, what is used the most is:\nJenkins: an open-source tool that automates software development tasks such as build, test, and deploy. ArgoCD is a continuous orchestration tool for Kubernetes, helping to automate the deployment of applications in microservices architecture and manage multiple Kubernetes environments consistently. This approach not only improves team performance but also enables your product to reach users more quickly and with higher quality. In the cloud computing environment, developers often use Docker to package and Kubernetes to orchestrate.\nContents The CI/CD operations process Jenkins ArgoCD In the following sections, we will delve into the fundamental concepts of CI/CD, Jenkins and ArgoCD.\n"
+},
+{
+	"uri": "//localhost:1313/1-introduce/1.1-cicdprocess/",
+	"title": "The CI/CD operations process",
+	"tags": [],
+	"description": "",
+	"content": "The CI/CD operations process To gain a deeper understanding of how the CI/CD process works, one needs to grasp the specific steps involved. So what do these steps include, and how do they function?\nContinuous Integration (CI) is the first process, where developers frequently merge their code into a common repository such as Git, multiple times a day. Each merge is often automatically built and tested to detect errors as early as possible, minimizing bug accumulation and reducing the time needed to deliver high-quality products. Continuous Delivery (CD) extends CI by ensuring that you can release a new version of the software at any time. In CD, the processes of building, testing, and preparing code for release are automated. Continuous Deployment (CD) is a further step beyond CD, where tested changes to the code are automatically released into the production environment. This ensures that any change, once verified, can be deployed automatically. The development lifecycle process along with the steps in CI/CD occur as follows:\nBuild: Create products from the source code, integrate, and detect errors. Test: Automatically examine new features and changed code. Deliver: Move tested code to a test environment, which can be automatic or after human approval. Deploy: Implement changes to the product, automatically or according to human approval. "
+},
+{
+	"uri": "//localhost:1313/2-installjenkins/",
+	"title": "Install Jenkins",
+	"tags": [],
+	"description": "",
+	"content": "Install Jenkins In this step, we will install Jenkins and integrate Gitlab with Jenkins\nContent Setup EC2 as Jenkins Server SSH into EC2 to install Jenkin Setup connection between Jenkins and Gitlab "
+},
+{
+	"uri": "//localhost:1313/1-introduce/1.2-jenkins/",
+	"title": "Jenkins",
+	"tags": [],
+	"description": "",
+	"content": "Jenkins Jenkins is an open-source automation tool that helps to automate various parts of the software development process such as building, testing, and deploying applications. It supports Continuous Integration (CI) and Continuous Delivery (CD).\nYou can use Amazon Elastic Compute Cloud (Amazon EC2) to deploy a Jenkins application on AWS in a matter of minutes.\nThis tutorial walks you through the process of deploying a Jenkins application. You will launch an EC2 instance, install and configure Jenkins on that instance.\n"
+},
+{
+	"uri": "//localhost:1313/3-installargocd/3.2-setupmanifest/",
+	"title": "Setup Repo Manifest",
+	"tags": [],
+	"description": "",
+	"content": "Setup Repo Manifest Clone the repository for your project on GitLab\nFor my project, the repository manifest will contain three folders corresponding to three parts: Front-end, Back-end, and Database\nRun pods corresponding to the 3 components above kubectl apply -f [folder_name] Here, [folder_name] is the name of the 3 folders that were just cloned\nCheck the status of pods\nminikube dashboard When the pods have finished running, proceed to import data into the database\nGet the name of the database pod\nkubectl get pod Perform port-forwarding to a database pod\nkubectl port-forward [database_pod_name] 3306:3306 Afterwards, you can open mysql workbench or datagrip to import data into the pod\n"
+},
+{
+	"uri": "//localhost:1313/2-installjenkins/2.2-sshec2/",
+	"title": "SSH into EC2 to install Jenkin",
+	"tags": [],
+	"description": "",
+	"content": "SSH into EC2 to install Jenkin Copy the link in the Example section Go to the folder containing the file key-pair just downloaded above, open it with Git bash and paste the path to ssh into EC2 Create network for 2 containers sudo chmod 666 /var/run/docker.sock\rdocker network create jenkins Setup docker:dind docker run --name jenkins-docker -d --privileged --network jenkins --network-alias docker --env DOCKER_TLS_CERTDIR=/certs --volume docker-certs-jk:/certs/client --volume jenkins-home:/var/jenkins_home -p 2376:2376 docker:dind --storage-driver overlay2 Run container Jenkins docker run --name jenkins -d --network jenkins --env DOCKER_HOST=tcp://docker:2376 --env DOCKER_CERT_PATH=/certs/client --env DOCKER_TLS_VERIFY=1 -p 8080:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home -v docker-certs-jk:/certs/client:ro jenkins/jenkins:2.426.2-lts-jdk17 Open port 8080 for Ec2 Select Security Group Choose Edit inbound rules In Type select CustomTCP Port range select 8080 Source select 0.0.0.0/0 Get the password to unlock Jenkins Replace [jenkins_container_id] with your id docker container ls\rdocker logs [jenkins_container_id] Save the password for later steps Unlock Jenkins Select the newly launched EC2 Copy Public IPv4 address Open the browser using the path Public_IPv4_address:8080 Paste the password above into the Administrator password section Create a Jenkins account Wait for Jenkins to finish booting Fill in your information Select Save and Continue Instance configuration Paste the address http://[Public_IPv4_address]:8080 into the Jenkins URL field Complete creating Jenkins "
+},
+{
+	"uri": "//localhost:1313/1-introduce/1.3-argocd/",
+	"title": "Argo CD",
+	"tags": [],
+	"description": "",
+	"content": "Argo CD Argo CD is an open-source project designed to provide automated deployment for Kubernetes projects. It follows the \u0026ldquo;GitOps\u0026rdquo; principle, automatically synchronizing Kubernetes projects to match the source code in the git repository. Simply commit changes to git, and Argo CD will take care of updating the projects in Kubernetes.\nThe main features of Argo CD include:\nAutomated deployment: When new commits are made to the tracked branch in the Git repository, Argo CD automatically deploys these changes to Kubernetes. Multi-environment management: Argo CD can manage multiple Kubernetes environments, from development (dev) and testing (staging) to production (production). Health and Integrity Checks: It can automatically check the \u0026ldquo;health\u0026rdquo; of the application after deployment and ensure integrity over time. Rollback \u0026amp; Rollout: Supports easily going back to previous versions or rolling out new updates in sequence. "
+},
+{
+	"uri": "//localhost:1313/3-installargocd/",
+	"title": "Deploy Argo CD",
+	"tags": [],
+	"description": "",
+	"content": "Deploy Argo CD In this step, we will demonstrate how to install Argo CD on Minikube and deploy applications on Minikube using the Argo CD UI.\nContent Installation and Deployment of Argo CD Setup Manifest Repo "
+},
+{
+	"uri": "//localhost:1313/2-installjenkins/2.3-connectec2/",
+	"title": "Setup connection between Jenkins and Gitlab",
+	"tags": [],
+	"description": "",
+	"content": "Setup connection between Jenkins and Gitlab Install plugin jenkins Go to Manage Jenkins -\u0026gt; Plugin -\u0026gt; Available plugin install the appropriate plugin for the project: Gitlab, Docker and Docker pipeline Install Tools jenkins\nManage Jenkins -\u0026gt; Tools, scroll down to JDK installations section and click on Add JDK In the Name section, set it as Jdk Choose Install automatically For Git, Docker, Maven do the same Create item\nAt the Jenkins interface, select New item Select Pipeline and name the pipeline Configuration for Jenkins\nIn the General section, you can choose as below to save the 5 most recent versions (number can be customized) Scroll down to the Build Trigger section, select the option below so that your Jenkins CI/CD Pipeline can run actions like push and merge code -Go to gitlab and copy the project clone URL\nReturn to the Jenkins interface, in Advanced Project Options, setup as shown below and the URL is the one just copied from gitlab Add Credentials (note that the gitlab account must have admin rights or sufficient project access rights, otherwise the Jenkins CI/CD pipeline cannot clone the code) Go out and select the Credential I just added Configuration for Pipeline Create a webhook on Gitlab so that Jenkins can connect to the Gitlab repository and perform CI/CD steps when new code is pushed.\nIn the Jenkins interface, next to User_name click on the arrow mark -\u0026gt; Configure Generate tokens for integration in gitlab Go to the project on gitlab, select Settings → Webhook -\u0026gt; Add new webhook Please configure the URL section as follows: http://\u0026lt;account trên jenkins\u0026gt;:\u0026lt;token account jenkins\u0026gt;@\u0026lt;địa chỉ jenkins\u0026gt;/project/\u0026lt;tên project trên jenkins\u0026gt;\rFor example: http://workshop:116ab6d523026ec1f474f13f1c0ea22345@13.229.78.87:8080/project/Workshop Configure Trigger Uncheck SSL verification and check the status of successful push events Complete Gitlab and Jenkins integration\nCreate Jenkinsfile\nIn project at root folder (same level as docker-compose.yml file), create Jenkinsfile as show I just added a simple job that prints out the current user and directory, now we will try to commit the code on Gitlab After the commit is complete, merge the request, which will enable the trigger for the CI/CD pipeline to start running Check Jenkins\nAt the Jenkins interface, all steps are successful "
+},
+{
+	"uri": "//localhost:1313/4-cleanup/",
+	"title": "Clean up resources",
+	"tags": [],
+	"description": "",
+	"content": "Terminate EC2 Instances Terminate EC2 instance:\nAccess the Amazon EC2 console at EC2. On the left navigation bar, select \u0026ldquo;Instances.\u0026rdquo; Select all EC2 instances related to the lab. Select Instance state. Select Terminate instance. Confirm termination.\n"
+},
+{
+	"uri": "//localhost:1313/categories/",
+	"title": "Categories",
+	"tags": [],
+	"description": "",
+	"content": ""
+},
+{
+	"uri": "//localhost:1313/tags/",
+	"title": "Tags",
+	"tags": [],
+	"description": "",
+	"content": ""
+}]
